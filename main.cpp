@@ -1,84 +1,250 @@
 #include <iostream>
-#include <GL/glut.h>
+#include <GL/freeglut.h>
 
+#include <unistd.h>
 #include <vector>
+#define _USE_MATH_DEFINES
+#include <math.h>
 
 using namespace std;
 
 #include "types.h"
 
-float frand()
-{
-    return static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
-}
+#define SCREEN_WIDTH glutGet(GLUT_WINDOW_WIDTH)
+#define SCREEN_HEIGHT glutGet(GLUT_WINDOW_HEIGHT)
 
-class Polygon
+Point2i Rotate(Point2i p, int angle);
+
+class Primitive
 {
 public:
-    explicit Polygon(int amount=4);
+    int x;
+    int y;
+    bool isFilled = false;
+    virtual void Draw() = 0;
+    virtual void Fill() = 0;
+};
 
-    void StackFill(Color3 color);
-    void Draw();
+class Scene
+{
+public:
+    void DrawScene();
+    void AddPrimitive(Primitive *p);
+    ~Scene();
+//private:
+    vector<Primitive *> primitives;
+};
 
-    vector<Point2f> vertexes;
+Scene::~Scene()
+{
+    for (auto i = primitives.end() ; i>=primitives.begin() ; --i )
+    {
+        delete (*i);
+        primitives.pop_back();
+    }
+}
+void Scene::AddPrimitive(Primitive *p)
+{
+    primitives.push_back(p);
+}
+
+void Scene::DrawScene()
+{
+    for (auto i = primitives.begin() ; i!=primitives.end() ; ++i )
+        (*i)->Draw();
+}
+
+Scene mainScene;
+
+class Polygon : public Primitive
+{
+public:
+    Polygon(int amount=4);
+    void Fill() override;
+    void Draw() override;
+    vector<Point2i> vertexes;
+
+private:
+    Point2i start_point = {200,200};
+    Point2i anchor_point;
+    bool isOnBorder(int x, int y);
 };
 
 Polygon::Polygon(int amount)
 {
-    Point2f point;
-    point.x = 0;
-    point.y = 0;
-    vertexes.push_back(point);
-
-    for (int i = 1 ; i < amount ; i++)
+    start_point = {200,200};
+    vertexes.push_back(start_point);
+    anchor_point = { start_point.x + 80 + rand() % 40 , start_point.y };
+    Point2i tmp = start_point;
+    int rest_angle = 360;
+    for (int i = 0 ; i < amount-1; i++)
     {
-        point.x = static_cast<float>(vertexes[i-1].x + rand() % 50) / 100.f;
-        point.y = static_cast<float>(vertexes[i-1].y + rand() % 50) / 100.f;
-        vertexes.push_back(point); 
+        //Получаем угол
+        int angle = 50 + (rand() % rest_angle) % 160;
+        rest_angle -= angle;
+        //Поворачиваем
+        tmp = anchor_point + Rotate(tmp - anchor_point, angle);
+        vertexes.push_back(tmp);
     }
-
-    //Make it "good"
-    // Need to check out an area where dot wanted to generate
 }
 
 void Polygon::Draw()
 {
     glBegin(GL_LINE_LOOP);
-    for (auto i = vertexes.begin() ; i != vertexes.end() ; ++i )
-    {
-            glVertex2f((*i).x ,(*i).y);
-    }
-            glVertex2f((*vertexes.begin()).x ,(*vertexes.begin()).y);
+        for (auto i = vertexes.begin() ; i != vertexes.end() ; ++i )
+            glVertex2i((*i).x,(*i).y);
+        glVertex2i((*vertexes.begin()).x ,(*vertexes.begin()).y);
     glEnd();
+}
+
+Point2i Rotate(Point2i p, int angle)
+{
+    float angle_rad = (float)angle / 180 * M_PI;
+    Point2i np;
+    np.x = p.x * cos(angle_rad) - p.y * sin(angle_rad);
+    np.y = +p.x * sin(angle_rad) + p.y * cos(angle_rad);
+    return np;
+}
+
+/* bool Polygon::isOnBorder(int x, int y)
+{
+    //Iterate throught all vertexes
+    float k;
+    float b;
+    for (auto i = 1; i < vertexes.size(); i++)
+    {
+        k = (float)(vertexes[i-1].y - vertexes[i].y) / (float)( vertexes[i-1].x - vertexes[i].x);
+        b = (float)(vertexes[i-1].x * vertexes[i].y - vertexes[i-1].y * vertexes[i].x) \
+                    / (float)( vertexes[i-1].x - vertexes[i].x);
+        if (y == k * (float)x + b)
+            return true;
+    }
+    return false;
+} */
+
+bool CheckPixel(int x, int y)
+{
+    uint8_t data = 0;
+    glReadPixels(x,y,1,1,GL_BLUE,GL_UNSIGNED_BYTE,&data);
+    if (data)
+        return false;
+    else
+        return true;
+}
+bool CheckPixel(Point2i p)
+{
+    uint8_t data = 0;
+    glReadPixels(p.x,p.y,1,1,GL_BLUE,GL_UNSIGNED_BYTE,&data);
+    if (data)
+        return false;
+    else
+        return true;
+}
+void fillPixel(Point2i p)
+{
+    uint8_t color = 255;
+    glRasterPos2i(p.x,p.y);
+    glDrawPixels(1,1,GL_BLUE, GL_UNSIGNED_BYTE, &color);
+}
+void fillPixel(int x, int y)
+{
+    uint8_t color = 255;
+    glRasterPos2i(x,y);
+    glDrawPixels(1,1,GL_BLUE, GL_UNSIGNED_BYTE, &color);
+}
+
+void Polygon::Fill()
+{   
+    Point2i start_point = anchor_point;
+
+    vector<Point2i> stack;
+    stack.push_back(start_point);
+
+    while(!stack.empty())
+    {
+        //Покрасить верхний пиксель
+        Point2i tmp = *(stack.end() - 1);
+        stack.pop_back();
+        if (CheckPixel(tmp))
+            fillPixel(tmp);
+        //Добавить соседей
+        if (CheckPixel(tmp.x + 1, tmp.y))
+            stack.push_back({tmp.x + 1, tmp.y});
+        if (CheckPixel(tmp.x, tmp.y + 1))
+            stack.push_back({tmp.x, tmp.y + 1});
+        if (CheckPixel(tmp.x - 1, tmp.y))
+            stack.push_back({tmp.x - 1, tmp.y});
+        if (CheckPixel(tmp.x, tmp.y - 1))
+            stack.push_back({tmp.x , tmp.y - 1});
+        //Нарисовать картинку
+        glFlush();
+    }
+    cout << "Filled\n"; 
 }
 
 void display()
 {
-    glClearColor(1.f,1.f,1.f,1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glColor3f(0.0f, 0.0f, 1.0f);
     glLineWidth(1);
-
-    glLineWidth(2);
     glColor3f(0.0f, 0.0f, 1.0f);
-    Polygon polygon;
-    polygon.Draw();
+
+    mainScene.DrawScene();
 
     glFlush();
 }
 
+void mouse(int button, int state, int x, int y)
+{
+    if (button == GLUT_RIGHT_BUTTON)
+    {
+        mainScene.primitives[0]->Fill();
+    }
+    else if ( button == GLUT_LEFT_BUTTON)
+    {
+        glutPostRedisplay();
+        if (state == GLUT_DOWN)
+        {
+            delete mainScene.primitives[0];
+            mainScene.primitives[0] = new Polygon(4);
+            glutPostRedisplay();
+        }
+    }
+    cout << "Mouse click " << x   << " " << y << "\n";
+}
+
+void resize(int w, int h)
+{
+    /*    
+    glMatrixMode(GL_PROJECTION); // Если раскоментить то размеры фигур не будут 
+    glLoadIdentity();            // зависеть от размеров окна
+    glOrtho(-SCREEN_WIDTH/2, SCREEN_WIDTH/2, -SCREEN_HEIGHT/2, SCREEN_HEIGHT/2, 0, 1.0); 
+    */
+    glViewport(0,0,w,h); 
+}
+
 int main(int argc, char* argv[])
 {
-    glutInit(&argc,argv);
-    glutInitWindowSize(1200,1200);
-    glutInitWindowPosition(100,100);
+    srand(time(NULL));
+    glutInit(&argc,argv); // Инициализация openGL
+    glutInitWindowSize(600,600); // Размер окна
+    glutInitWindowPosition(100,100); // Позиция окна
+    glutInitDisplayMode(GLUT_RGB); // Режим отображения
 
-    glutInitDisplayMode(GLUT_RGB);
-    //glutDisplayFunc(display);
-    //glutIdleFunc(display);
     glutCreateWindow("OpenGl");
-    display();
+    glutDisplayFunc(display); // Установка callback-функций
+    glutMouseFunc(mouse);
+    glutReshapeFunc(resize);
+
+    glMatrixMode(GL_PROJECTION); // Задание матрицы отображения
+    glLoadIdentity();
+    glOrtho(0, SCREEN_WIDTH, 0, SCREEN_HEIGHT, 0, 1.0);
+ 
+    Polygon *polygon = new Polygon(5);
+    mainScene.AddPrimitive(polygon);
+
+    glClear(GL_COLOR_BUFFER_BIT);
+
     glutMainLoop();
 
     return 0;

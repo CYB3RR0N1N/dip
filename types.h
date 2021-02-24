@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+struct Point2i;
+
 struct Point2f
 {
     float x;
@@ -16,8 +18,19 @@ struct Pontf3f : public Point2f
 
 struct Point2i
 {
+    Point2i(){}
+    Point2i(int _x, int _y) { x = _x ; y = _y; }
     int x;
     int y;
+    Point2i operator+(Point2i a)
+    {
+        return {this->x + a.x, this->y + a.y};
+    }
+
+    Point2i operator-(Point2i a)
+    {
+        return {this->x - a.x, this->y - a.y};
+    }
 };
 
 struct Point3i : public Point2i
