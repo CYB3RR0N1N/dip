@@ -22,7 +22,7 @@ public:
     int y;
     bool isFilled = false;
     virtual void Draw() = 0;
-    virtual void Fill() = 0;
+    virtual void Fill() {} ;
 };
 
 class Scene
@@ -69,7 +69,6 @@ private:
     Point2i anchor_point;
     bool isOnBorder(int x, int y);
 };
-
 Polygon::Polygon(int amount)
 {
     start_point = {200,200};
@@ -87,7 +86,6 @@ Polygon::Polygon(int amount)
         vertexes.push_back(tmp);
     }
 }
-
 void Polygon::Draw()
 {
     glBegin(GL_LINE_LOOP);
@@ -96,7 +94,6 @@ void Polygon::Draw()
         glVertex2i((*vertexes.begin()).x ,(*vertexes.begin()).y);
     glEnd();
 }
-
 Point2i Rotate(Point2i p, int angle)
 {
     float angle_rad = (float)angle / 180 * M_PI;
@@ -152,7 +149,6 @@ void fillPixel(int x, int y)
     glRasterPos2i(x,y);
     glDrawPixels(1,1,GL_BLUE, GL_UNSIGNED_BYTE, &color);
 }
-
 void Polygon::Fill()
 {   
     Point2i start_point = anchor_point;
@@ -182,12 +178,78 @@ void Polygon::Fill()
     cout << "Filled\n"; 
 }
 
+class Line: public Primitive
+{
+    Point2i begin;
+    Point2i end;
+public:
+    Line(int x1, int y1, int x2, int y2);
+    void Draw() override;
+};
+
+Line::Line(int x1, int y1, int x2, int y2)
+{
+    begin = {x1,y1};
+    end = {x2,y2};
+}
+int Sign(int a)
+{
+    if (a == 0)
+        return 0;
+    else if (a > 0)
+        return 1;
+    else if (a < 0)
+        return -1;
+}
+void Line::Draw()
+{
+    glColor3ub(rand() % 255, rand() % 255, rand() % 255);
+    int x = begin.x;
+    int y = begin.y;
+    int dx = abs(end.x - begin.x);
+    int dy = abs(end.y - begin.y);
+    int s1 = Sign(end.x - begin.x);
+    int s2 = Sign(end.y - begin.y);
+    bool is_swap = false;
+    if (dy > dx)
+    {
+        swap(dy,dx);
+        is_swap = false;
+    }
+    int e = 2 * dy - dx;
+
+    for (int i = 0 ; i < dx ; i++)
+    {
+        glBegin(GL_POINTS);
+            glVertex2i(x,y);
+        glEnd();
+
+        while (e >=0)
+        {
+            if (is_swap)
+                x += s1;
+            else
+                y += s2;
+            e -= 2*dx;
+        }
+
+        if (is_swap)
+            y += s2;
+        else
+            x += s1;
+
+        e+=2*dy;
+    }
+    //for ( int i = 0 ; i < dx ; i++)
+    glFlush();
+}
+
 void display()
 {
     glClear(GL_COLOR_BUFFER_BIT);
 
     glLineWidth(1);
-    glColor3f(0.0f, 0.0f, 1.0f);
+    glColor3ub(rand() % 255, rand() % 255, rand() % 255);
 
     mainScene.DrawScene();
 
@@ -240,9 +302,11 @@ int main(int argc, char* argv[])
     glLoadIdentity();
     glOrtho(0, SCREEN_WIDTH, 0, SCREEN_HEIGHT, 0, 1.0);
  
-    Polygon *polygon = new Polygon(5);
-    mainScene.AddPrimitive(polygon);
-
+    for (int i = 0 ; i < 100 ; i++)
+    {
+        Line *line = new Line(rand() % 500,rand() % 500,rand() % 500,rand() % 500);
+        mainScene.AddPrimitive(line);
+    }
     glClear(GL_COLOR_BUFFER_BIT);
 
     glutMainLoop();
