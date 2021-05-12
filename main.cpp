@@ -200,6 +200,7 @@ int Sign(int a)
         return 1;
     else if (a < 0)
         return -1;
+    return 0;
 }
 void Line::Draw()
 {
@@ -242,6 +243,70 @@ void Line::Draw()
     }
     //for ( int i = 0 ; i < dx ; i++)
     glFlush();
+}
+
+int Distance(Point2i p1, Point2i p2)
+{
+    return sqrt((p1.x - p2.x)*(p1.x - p2.x) + (p1.y - p2.y)*(p1.y - p2.y));
+}
+
+class KohLine: public Primitive
+{
+public:    
+    void Draw() override;
+    vector<Point2i> vertexes;
+
+    int DrawPattern(Point2i p1, Point2i p2, int rec){
+        if (rec > 20 || Distance(p1,p2) < 2)
+        {
+            glBegin(GL_LINE_LOOP);
+                glVertex2i(p1.x,p1.y);
+                glVertex2i(p2.x,p2.y);
+            glEnd();
+            return rec;
+        }
+        else
+        {
+            rec++;
+            //       b
+            // p1--a    c   p2
+            //
+
+            //Calculate a
+            Point2i a;
+            a.x = p1.x + (p2.x - p1.x) / 3;
+            a.y = p1.y + (p2.y - p1.y) / 3;
+            //Calculate c
+            Point2i c;
+            c.x = p1.x + 2 * (p2.x - p1.x) / 3;
+            c.y = p1.y + 2 * (p2.y - p1.y) / 3;
+            //Calculate b
+            Point2i b;
+            b.x = a.x + (c.x - a.x) / 2 - (-0.866)*(float)(c.y - a.y);
+            b.y = a.y + (float)((c.x - a.x)*(-0.866)) + (c.y - a.y)/2;
+
+            // glBegin(GL_LINE_LOOP);
+            //     glVertex2i(p1.x,p1.y);
+            //     glVertex2i(a.x,a.y);
+            //     glVertex2i(b.x,b.y);
+            //     glVertex2i(c.x,c.y);
+            //     glVertex2i(p2.x,p2.y);
+            // glEnd();
+
+            DrawPattern(p1,a,rec);
+            DrawPattern(a,b,rec);
+            DrawPattern(b,c,rec);
+            return DrawPattern(c,p2,rec);
+        }
+    }
+    void CalculateLimit();
+private:
+    int recursion_steps = 0;
+};
+
+void KohLine::Draw()
+{
+    cout << "Max recursion " << DrawPattern({50,500}, {500,500}, 0) << endl;
 }
 
 void display()
@@ -302,11 +367,14 @@ int main(int argc, char* argv[])
     glLoadIdentity();
     glOrtho(0, SCREEN_WIDTH, 0, SCREEN_HEIGHT, 0, 1.0);
  
-    for (int i = 0 ; i < 100 ; i++)
-    {
-        Line *line = new Line(rand() % 500,rand() % 500,rand() % 500,rand() % 500);
-        mainScene.AddPrimitive(line);
-    }
+    // for (int i = 0 ; i < 100 ; i++)
+    // {
+    //     Line *line = new Line(rand() % 500,rand() % 500,rand() % 500,rand() % 500);
+    //     mainScene.AddPrimitive(line);
+    // }
+    KohLine kline;
+    mainScene.AddPrimitive(&kline);
+
     glClear(GL_COLOR_BUFFER_BIT);
 
     glutMainLoop();
