@@ -47,7 +47,6 @@ void Scene::AddPrimitive(Primitive *p)
 {
     primitives.push_back(p);
 }
-
 void Scene::DrawScene()
 {
     for (auto i = primitives.begin() ; i!=primitives.end() ; ++i )
@@ -63,6 +62,8 @@ public:
     void Fill() override;
     void Draw() override;
     vector<Point2i> vertexes;
+    void Move(int x, int y);
+    void Scale(float x, float y);
 
 private:
     Point2i start_point = {200,200};
@@ -94,6 +95,24 @@ void Polygon::Draw()
         glVertex2i((*vertexes.begin()).x ,(*vertexes.begin()).y);
     glEnd();
 }
+void Polygon::Move(int x, int y)
+{
+    for (auto i = vertexes.begin(); i != vertexes.end(); ++i)
+    {
+        (*i).x += x;
+        (*i).y += y;
+    }
+}
+
+void Polygon::Scale(float x, float y)
+{
+    for (auto i = vertexes.begin(); i != vertexes.end(); ++i)
+    {
+        (*i).x *= x;
+        (*i).y *= y;
+    }
+}
+
 Point2i Rotate(Point2i p, int angle)
 {
     float angle_rad = (float)angle / 180 * M_PI;
@@ -102,22 +121,6 @@ Point2i Rotate(Point2i p, int angle)
     np.y = +p.x * sin(angle_rad) + p.y * cos(angle_rad);
     return np;
 }
-
-/* bool Polygon::isOnBorder(int x, int y)
-{
-    //Iterate throught all vertexes
-    float k;
-    float b;
-    for (auto i = 1; i < vertexes.size(); i++)
-    {
-        k = (float)(vertexes[i-1].y - vertexes[i].y) / (float)( vertexes[i-1].x - vertexes[i].x);
-        b = (float)(vertexes[i-1].x * vertexes[i].y - vertexes[i-1].y * vertexes[i].x) \
-                    / (float)( vertexes[i-1].x - vertexes[i].x);
-        if (y == k * (float)x + b)
-            return true;
-    }
-    return false;
-} */
 
 bool CheckPixel(int x, int y)
 {
@@ -240,7 +243,6 @@ void Line::Draw()
 
         e+=2*dy;
     }
-    //for ( int i = 0 ; i < dx ; i++)
     glFlush();
 }
 
@@ -260,16 +262,33 @@ void mouse(int button, int state, int x, int y)
 {
     if (button == GLUT_RIGHT_BUTTON)
     {
-        mainScene.primitives[0]->Fill();
+        //mainScene.primitives[0]->Fill(); 
     }
     else if ( button == GLUT_LEFT_BUTTON)
     {
         glutPostRedisplay();
         if (state == GLUT_DOWN)
         {
-            delete mainScene.primitives[0];
-            mainScene.primitives[0] = new Polygon(4);
-            glutPostRedisplay();
+            static int i = 0;
+            switch (i)
+            {
+            case 0:
+                dynamic_cast<Polygon*>(mainScene.primitives[0])->Move(100,100);
+                glutPostRedisplay();
+                i++;
+                break;
+            case 1:
+                dynamic_cast<Polygon*>(mainScene.primitives[0])->Scale(0.5,0.5);
+                glutPostRedisplay();
+                i++;
+                break;
+            default:
+                i = 0;
+                delete mainScene.primitives[0];
+                mainScene.primitives[0] = new Polygon(4);
+                glutPostRedisplay();
+                break;
+            }
         }
     }
     cout << "Mouse click " << x   << " " << y << "\n";
@@ -302,11 +321,14 @@ int main(int argc, char* argv[])
     glLoadIdentity();
     glOrtho(0, SCREEN_WIDTH, 0, SCREEN_HEIGHT, 0, 1.0);
  
-    for (int i = 0 ; i < 100 ; i++)
-    {
-        Line *line = new Line(rand() % 500,rand() % 500,rand() % 500,rand() % 500);
-        mainScene.AddPrimitive(line);
-    }
+    // for (int i = 0 ; i < 100 ; i++)
+    // {
+    //     Line *line = new Line(rand() % 500,rand() % 500,rand() % 500,rand() % 500);
+    //     mainScene.AddPrimitive(line);
+    // }
+    Polygon *p = new Polygon(4);
+    mainScene.AddPrimitive(p);
+
     glClear(GL_COLOR_BUFFER_BIT);
 
     glutMainLoop();
